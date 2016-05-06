@@ -10,29 +10,48 @@ module Jekyll
         # Various constants
         MTIME_PAGE_VAR = 'mtime'
 
+        def self.get_mtime(path=nil)
+            additional_status_options = ''
+            additional_log_options = ''
+
+            if (path != nil)
+                additional_status_options = "--ignored -- #{path}"
+                additional_log_options = "-- #{path}"
+            end
+
+            git_status_str = `git status --porcelain -uall #{additional_status_options}`
+            if ($? != 0)
+                raise GitError, "git status failed"
+            end
+
+            if (!git_status_str.empty?)
+                # git status reported that the file or workspace has been modified/ignored/staged/...
+                return nil
+            else
+                git_log_str = `git log -1 --format=format:"%ct" #{additional_log_options}`
+                if ($? != 0 || git_log_str.empty?)
+                    raise GitError, "git log failed"
+                end
+
+                return Time.at git_log_str.to_i
+            end
+        end
+
         Jekyll::Hooks.register(:pages, :post_init, priority: LOW_PRIORITY) do |page|
-            if (page.data[MTIME_PAGE_VAR] == 'site.time' || page.data[MTIME_PAGE_VAR] == 'build')
+            puts page.name
+            puts page.data[MTIME_PAGE_VAR] || "empty"
+            if (page.data[MTIME_PAGE_VAR] == 'build' || page.data[MTIME_PAGE_VAR] == 'site.time')
                 # mtime has been explicitly set to site.time (time of current build)
                 page.data[MTIME_PAGE_VAR] = page.site.time
+            elsif (page.data[MTIME_PAGE_VAR] == 'site' || page.data[MTIME_PAGE_VAR] == 'branch')
+                # set mtime to the time of the latest of any commits (not necessarily related to the current page“
+                page.data[MTIME_PAGE_VAR] = get_mtime || page.site.time
             elsif (page.data[MTIME_PAGE_VAR] == nil)
-                git_status_str = `git status --porcelain -uall --ignored -- #{page.path}`
-                if ($? != 0)
-                    raise GitError, "git status failed"
-                end
-
-                if (!git_status_str.empty?)
-                    # git status reported that the file has been modified/ignored/staged/...
-                    # => report file mtime instead of the last commit's time
-                    page.data['mtime'] = File.mtime page.path
-                else
-                    git_log_str = `git log -1 --format=format:"%ct" -- #{page.path}`
-                    if ($? != 0 || git_log_str.empty?)
-                        raise GitError, "git log failed"
-                    end
-
-                    page.data['mtime'] = Time.at git_log_str.to_i
-                end
+                # set mtime to the time of the last commit related to the current page
+                page.data[MTIME_PAGE_VAR] = get_mtime(page.path) || File.mtime(page.path)
             end
+            puts page.data[MTIME_PAGE_VAR]
+            puts ""
         end
     end
 end
