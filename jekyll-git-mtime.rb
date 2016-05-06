@@ -38,8 +38,6 @@ module Jekyll
         end
 
         Jekyll::Hooks.register(:pages, :post_init, priority: LOW_PRIORITY) do |page|
-            puts page.name
-            puts page.data[MTIME_PAGE_VAR] || "empty"
             if (page.data[MTIME_PAGE_VAR] == 'build' || page.data[MTIME_PAGE_VAR] == 'site.time')
                 # mtime has been explicitly set to site.time (time of current build)
                 page.data[MTIME_PAGE_VAR] = page.site.time
@@ -50,8 +48,6 @@ module Jekyll
                 # set mtime to the time of the last commit related to the current page
                 page.data[MTIME_PAGE_VAR] = get_mtime(page.path) || File.mtime(page.path)
             end
-            puts page.data[MTIME_PAGE_VAR]
-            puts ""
         end
     end
 end
