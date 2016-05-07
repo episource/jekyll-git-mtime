@@ -1,5 +1,3 @@
-require 'html-proofer'
-
 module Jekyll
     module GitMtime
         class GitError < StandardError; end
